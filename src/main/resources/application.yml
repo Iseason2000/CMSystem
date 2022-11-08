@@ -24,3 +24,7 @@ knife4j:
   setting:
     enableFooter: false
 
+mybatis-plus:
+  configuration:
+    cache-enabled: true
+
