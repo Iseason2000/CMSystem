@@ -1,0 +1,26 @@
+spring:
+  mvc:
+    path-match:
+      matching-strategy: ant_path_matcher
+  datasource:
+    driver-class-name: org.h2.Driver
+    hikari:
+      jdbc-url: 'jdbc:h2:file:./database/cm_system;auto_server=true;mode=mysql'
+      driver-class-name: org.h2.Driver
+      username: test
+      password: test
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:sql/schema.sql
+      platform: h2
+
+server:
+  port: 80
+
+knife4j:
+  enable: true
+  setting:
+    enableFooter: false
+
