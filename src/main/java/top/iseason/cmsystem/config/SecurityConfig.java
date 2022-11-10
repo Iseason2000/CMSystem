@@ -13,7 +13,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandlerImpl;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
-import top.iseason.cmsystem.entity.BaseUser;
+import top.iseason.cmsystem.entity.user.BaseUser;
 import top.iseason.cmsystem.service.UserService;
 import top.iseason.cmsystem.utils.Result;
 import top.iseason.cmsystem.utils.ResultCode;
@@ -27,6 +27,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .formLogin()
+                .usernameParameter("username")
+                .passwordParameter("password")
                 .loginProcessingUrl("/public/login")
                 .permitAll()
                 .successHandler((request, response, authentication) -> {
@@ -61,6 +63,9 @@ public class SecurityConfig {
                     response.getWriter().write(result.toString());
                 })
                 .and()
+                .rememberMe()
+                .key("remember")
+                .and()
                 .logout()
                 .logoutUrl("/public/logout")
                 .permitAll()
@@ -76,6 +81,7 @@ public class SecurityConfig {
                 .antMatchers("/team/**").hasAnyRole("TEAM", "ADMIN")
                 .antMatchers("/organization/**").hasAnyRole("ORGANIZATION", "ADMIN")
                 .antMatchers("/admin/**").hasRole("ADMIN")
+                .antMatchers("/user/**").authenticated()
                 .antMatchers("/public/**").permitAll()
 //                .antMatchers("/doc.html").permitAll()
 //                .antMatchers("/webjars/**").permitAll()
