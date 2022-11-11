@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS `CM_System`.`base_user`
     `id`       int primary key not null auto_increment comment '用户id',
     `mail`     varchar(255)    not null comment '用户邮箱',
     `password` varchar(255)    not null comment '用户密码',
+    `phone`    varchar(12) comment '联系电话',
     `role`     int             not null comment '用户权限',
     unique index base_user_mail (`mail`),
     unique index base_user_mail_password (`mail`, `password`)
@@ -95,3 +96,22 @@ CREATE TABLE IF NOT EXISTS `CM_System`.`work`
     foreign key (`real_id`) references `real_work` (`id`) on delete set null,
     index work_team_id (`team_id`)
 ) comment '作品表';
+CREATE TABLE IF NOT EXISTS `CM_System`.`channel`
+(
+    `id`              int primary key not null auto_increment comment '赛道id',
+    `organization_id` int             not null comment '组织id',
+    `title`           varchar(255)    not null comment '赛道名称',
+    `content`         text comment '赛道内容',
+    `create_time`     int comment '创建时间',
+    `end_time`        float comment '结束时间',
+    foreign key (`organization_id`) references `user_team` (`id`) on delete cascade,
+    index work_channel_id_time (`organization_id`, `title`)
+) comment '赛道表';
+CREATE TABLE IF NOT EXISTS `CM_System`.`relation_work_channel`
+(
+    `work_id`    int primary key not null comment '赛道id',
+    `channel_id` int             not null comment '组织id',
+    foreign key (`work_id`) references `work` (`id`) on delete cascade,
+    foreign key (`channel_id`) references `channel` (`id`) on delete cascade,
+    unique index relation_work_channel (`work_id`, `channel_id`)
+) comment '赛道表';

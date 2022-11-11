@@ -30,10 +30,15 @@ public enum ResultCode {
     USER_ACCOUNT_NOT_EXIST(2007, "账号不存在"),
     USER_ACCOUNT_ALREADY_EXIST(2008, "账号已存在"),
     USER_ACCOUNT_USE_BY_OTHERS(2009, "账号下线"),
-    USER_NOT_EXIST(3001, "用户ID不存在"),
+    USER_NOT_EXIST(2201, "用户ID不存在"),
+    USER_ID_EXIST(2202, "邮箱已注册"),
+    CHANNEL_NOT_EXIST(3001, "赛道不存在"),
+    WORK_NOT_EXIST(4001, "作品不存在"),
+    WORK_ALREADY_EXIST_CHANNEL(4002, "作品已投入该赛道"),
+    WORK_NOT_EXIST_CHANNEL(4003, "该作品没有参与该赛道"),
 
     /* 业务错误 */
-    NO_PERMISSION(4001, "没有权限");
+    NO_PERMISSION(9001, "没有权限");
 
     /**
      * 状态码

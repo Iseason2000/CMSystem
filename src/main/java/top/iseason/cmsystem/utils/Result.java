@@ -24,7 +24,7 @@ public class Result {
      * 数据 (如果有的话)
      */
     @ApiModelProperty("返回数据(可能不存在)")
-    private Object[] data;
+    private Object data;
     private final static ObjectMapper objectMapper;
 
     static {
@@ -39,12 +39,24 @@ public class Result {
                 .setData(data);
     }
 
+    public static Result success(Object data) {
+        return new Result()
+                .setResult(ResultCode.SUCCESS)
+                .setData(data);
+    }
+
     public static Result success() {
         return new Result()
                 .setResult(ResultCode.SUCCESS);
     }
 
     public static Result failure(Object... data) {
+        return new Result()
+                .setResult(ResultCode.COMMON_FAIL)
+                .setData(data);
+    }
+
+    public static Result failure(Object data) {
         return new Result()
                 .setResult(ResultCode.COMMON_FAIL)
                 .setData(data);

@@ -1,8 +1,9 @@
-package top.iseason.cmsystem.controller;
+package top.iseason.cmsystem.controller.user;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,7 +16,7 @@ import top.iseason.cmsystem.utils.Role;
 
 import javax.annotation.Resource;
 
-@Api(tags = "用户信息API")
+@Api(tags = "用户信息API, 需要登录")
 @RestController
 @RequestMapping("/user")
 public class UserController {
@@ -34,7 +35,8 @@ public class UserController {
     @Resource
     AdminMapper adminMapper;
 
-    @ApiOperation(value = "获取用户信息", notes = "安全接口,在所有请求的请求头中加入 'X-CSRF-TOKEN': token")
+    @Transactional(readOnly = true)
+    @ApiOperation(value = "获取用户信息", notes = "用户信息分为2部分，一个是用户通用信息，一个是角色信息")
     @GetMapping("/{id}")
     public Result getUserInfo(@PathVariable String id) {
         BaseUser baseUser = userMapper.selectById(id);
@@ -63,5 +65,6 @@ public class UserController {
         if (user == null) return Result.of(ResultCode.USER_NOT_EXIST);
         return Result.success(baseUser, user);
     }
+
 
 }

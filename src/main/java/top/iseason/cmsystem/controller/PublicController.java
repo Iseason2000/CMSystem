@@ -1,28 +1,27 @@
 package top.iseason.cmsystem.controller;
 
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiResponse;
-import io.swagger.annotations.ApiResponses;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import io.swagger.annotations.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.web.bind.annotation.*;
+import top.iseason.cmsystem.entity.channel.Channel;
 import top.iseason.cmsystem.entity.user.BaseUser;
 import top.iseason.cmsystem.entity.user.Judge;
 import top.iseason.cmsystem.entity.user.Organization;
 import top.iseason.cmsystem.entity.user.Team;
-import top.iseason.cmsystem.mapper.JudgeMapper;
-import top.iseason.cmsystem.mapper.OrganizationMapper;
-import top.iseason.cmsystem.mapper.TeamMapper;
-import top.iseason.cmsystem.mapper.UserMapper;
+import top.iseason.cmsystem.mapper.*;
 import top.iseason.cmsystem.utils.Result;
+import top.iseason.cmsystem.utils.ResultCode;
 import top.iseason.cmsystem.utils.Role;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.util.List;
 
 @Api(tags = "公开API，无权限校验")
 @RestController
@@ -44,6 +43,8 @@ public class PublicController {
     @Resource
     OrganizationMapper organizationMapper;
 
+    @Resource
+    ChannelMapper channelMapper;
     @Resource
     PasswordEncoder passwordEncoder;
 
@@ -83,6 +84,7 @@ public class PublicController {
     public Result registerJudge(
             @RequestParam String mail,
             @RequestParam String password,
+            @RequestParam(required = false) String phone,
             @RequestParam String name,
             @RequestParam String idCard,
             @RequestParam String company,
@@ -100,7 +102,6 @@ public class PublicController {
                 .setCompany(company)
                 .setCareer(career)
                 .setProfile(profile);
-
         judgeMapper.insert(judge);
 
         return Result.success(judge);
@@ -115,6 +116,7 @@ public class PublicController {
     public Result registerTeam(
             @RequestParam String mail,
             @RequestParam String password,
+            @RequestParam(required = false) String phone,
             @RequestParam String name,
             @RequestParam String leader,
             @RequestParam String member,
@@ -123,8 +125,14 @@ public class PublicController {
         BaseUser baseUser = new BaseUser()
                 .setMail(mail)
                 .setPassword(passwordEncoder.encode(password))
+                .setPhone(phone)
                 .setRole(Role.TEAM);
-        userMapper.insert(baseUser);
+        try {
+            userMapper.insert(baseUser);
+        } catch (Exception e) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return Result.of(ResultCode.USER_ID_EXIST);
+        }
         Team team = new Team()
                 .setUserId(baseUser.getId())
                 .setName(name)
@@ -133,7 +141,6 @@ public class PublicController {
                 .setInstructor(instructor)
                 .setProfile(profile);
         teamMapper.insert(team);
-
         return Result.success(team);
     }
 
@@ -146,6 +153,7 @@ public class PublicController {
     public Result registerOrganization(
             @RequestParam String mail,
             @RequestParam String password,
+            @RequestParam(required = false) String phone,
             @RequestParam String name,
             @RequestParam String owner,
             @RequestParam String idCard,
@@ -153,6 +161,7 @@ public class PublicController {
         BaseUser baseUser = new BaseUser()
                 .setMail(mail)
                 .setPassword(passwordEncoder.encode(password))
+                .setPhone(phone)
                 .setRole(Role.ORGANIZATION);
         userMapper.insert(baseUser);
 
@@ -165,6 +174,24 @@ public class PublicController {
 
         organizationMapper.insert(organization);
         return Result.success(organization);
+    }
+
+    @ApiOperation(value = "获取所有比赛(没有内容)")
+    @GetMapping("channel/{page}")
+    @ApiImplicitParams(value = {
+            @ApiImplicitParam(name = "page", value = "页码", dataType = "java.lang.Integer"),
+            @ApiImplicitParam(name = "size", value = "每页容量，默认10", dataType = "java.lang.Integer"),
+            @ApiImplicitParam(name = "isAsc", value = "是否顺序", dataType = "java.lang.Boolean")
+    })
+    public Result getWork(@PathVariable Integer page, @RequestParam(required = false) Integer size, @RequestParam(required = false) Boolean isAsc) {
+        if (page == null || page <= 0) page = 1;
+        if (size == null || size <= 0) size = 10;
+        List<Channel> records = channelMapper.selectList(
+                new LambdaQueryWrapper<Channel>()
+                        .select(Channel.class, tableFieldInfo -> !tableFieldInfo.getColumn().equals("content"))
+                        .orderBy(isAsc == null || isAsc, true, Channel::getId)
+                        .last("limit " + (page - 1) * size + "," + size));
+        return Result.success(records);
     }
 }
 

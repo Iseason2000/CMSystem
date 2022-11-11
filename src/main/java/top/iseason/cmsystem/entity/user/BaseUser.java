@@ -21,12 +21,14 @@ public class BaseUser implements Serializable {
     private Integer id;
     @ApiModelProperty("邮箱")
     private String mail;
+    @ApiModelProperty("手机")
+    private String phone;
     @ApiModelProperty("密码")
     private String password;
     @ApiModelProperty("权限")
     private Role role;
 
     public User toUser() {
-        return new User(mail, password, Collections.singletonList(new SimpleGrantedAuthority(role.name())));
+        return new User(mail, password, Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role.name())));
     }
 }

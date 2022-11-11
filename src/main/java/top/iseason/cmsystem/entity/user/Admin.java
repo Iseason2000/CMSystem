@@ -1,5 +1,6 @@
 package top.iseason.cmsystem.entity.user;
 
+import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import io.swagger.annotations.ApiModelProperty;
@@ -12,7 +13,7 @@ import java.io.Serializable;
 @Accessors(chain = true)
 @TableName(value = "user_admin")
 public class Admin implements Serializable {
-    @TableId
+    @TableId(type = IdType.AUTO)
     private Integer id;
     private Integer userId;
     @ApiModelProperty("管理员名字")
