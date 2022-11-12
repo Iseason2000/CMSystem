@@ -35,7 +35,10 @@ public enum ResultCode {
     CHANNEL_NOT_EXIST(3001, "赛道不存在"),
     WORK_NOT_EXIST(4001, "作品不存在"),
     WORK_ALREADY_EXIST_CHANNEL(4002, "作品已投入该赛道"),
-    WORK_NOT_EXIST_CHANNEL(4003, "该作品没有参与该赛道"),
+    WORK_ALREADY_EXIST_SCORE(4003, "作品已评分"),
+    WORK_NOT_EXIST_CHANNEL(4004, "该作品没有参与该赛道"),
+    JUDGE_ALREADY_EXIST_CHANNEL(4011, "该裁判已经在此赛道"),
+    JUDGE_NOT_EXIST_CHANNEL(4012, "该裁判不在在此赛道"),
 
     /* 业务错误 */
     NO_PERMISSION(9001, "没有权限");

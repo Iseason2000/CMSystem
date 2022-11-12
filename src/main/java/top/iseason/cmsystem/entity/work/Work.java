@@ -23,7 +23,5 @@ public class Work implements Serializable {
     private String profile;
     @ApiModelProperty("作品内容")
     private String content;
-    @ApiModelProperty("作品得分")
-    private Double score;
 
 }

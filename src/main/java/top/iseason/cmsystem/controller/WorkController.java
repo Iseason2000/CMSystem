@@ -6,14 +6,18 @@ import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.web.bind.annotation.*;
 import top.iseason.cmsystem.entity.channel.Channel;
-import top.iseason.cmsystem.entity.relationship.WorkToChannel;
+import top.iseason.cmsystem.entity.relationship.JudgeChannel;
+import top.iseason.cmsystem.entity.relationship.WorkChannel;
+import top.iseason.cmsystem.entity.relationship.WorkScore;
+import top.iseason.cmsystem.entity.user.Judge;
+import top.iseason.cmsystem.entity.user.Organization;
 import top.iseason.cmsystem.entity.user.Team;
 import top.iseason.cmsystem.entity.work.Work;
-import top.iseason.cmsystem.mapper.ChannelMapper;
-import top.iseason.cmsystem.mapper.WorkMapper;
-import top.iseason.cmsystem.mapper.WorkToChannelMapper;
+import top.iseason.cmsystem.mapper.*;
 import top.iseason.cmsystem.utils.Result;
 import top.iseason.cmsystem.utils.ResultCode;
 import top.iseason.cmsystem.utils.UserUtil;
@@ -31,10 +35,17 @@ public class WorkController {
     WorkMapper workMapper;
     @Resource
     ChannelMapper channelMapper;
-    @Resource
-    WorkToChannelMapper workToChannelMapper;
 
-    @ApiOperation(value = "获取该团队所有作品(没有内容)", notes = "需要团队权限，每页最多显示10个作品")
+    @Resource
+    WorkChannelMapper workChannelMapper;
+
+    @Resource
+    JudgeChannelMapper judgeChannelMapper;
+
+    @Resource
+    WorkScoreMapper workScoreMapper;
+
+    @ApiOperation(value = "获取该团队所有作品", notes = "需要团队权限，每页最多显示10个作品, (不显示内容)")
     @PreAuthorize("hasAnyRole('TEAM')")
     @GetMapping("page/{page}")
     @ApiImplicitParams(value = {
@@ -72,12 +83,15 @@ public class WorkController {
     @PostMapping("")
     public Result createWork(
             @RequestParam String name,
-            @RequestParam String profile) {
+            @RequestParam String profile,
+            @RequestParam String content
+    ) {
         Team team = UserUtil.getTeam();
         if (team == null) return Result.failure();
         Work work = new Work()
                 .setTeamId(team.getId())
                 .setName(name)
+                .setContent(content)
                 .setProfile(profile);
         workMapper.insert(work);
         return Result.success(work);
@@ -114,9 +128,10 @@ public class WorkController {
         else return Result.of(ResultCode.WORK_NOT_EXIST);
     }
 
+    @Transactional
     @ApiOperation(value = "将作品投递至赛道", notes = "需要团队权限")
     @PreAuthorize("hasAnyRole('TEAM')")
-    @PostMapping("/relationship/{channelId}/{workId}")
+    @PostMapping("/channel/{channelId}/{workId}")
     public Result postWorkToChannel(
             @PathVariable String channelId,
             @PathVariable String workId
@@ -127,18 +142,48 @@ public class WorkController {
         if (channel == null) return Result.of(ResultCode.CHANNEL_NOT_EXIST);
         Work work = workMapper.selectOne(new LambdaQueryWrapper<Work>().select(Work::getId).eq(Work::getId, workId).eq(Work::getTeamId, team.getId()));
         if (work == null) return Result.of(ResultCode.WORK_NOT_EXIST);
-        WorkToChannel workToChannel = new WorkToChannel().setWorkId(work.getId()).setChannelId(channel.getId());
+        WorkChannel workToChannel = new WorkChannel().setWorkId(work.getId()).setChannelId(channel.getId());
         try {
-            workToChannelMapper.insert(workToChannel);
+            workChannelMapper.insert(workToChannel);
         } catch (Exception e) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return Result.of(ResultCode.WORK_ALREADY_EXIST_CHANNEL);
         }
         return Result.success(workToChannel);
     }
 
+    @ApiOperation(value = "查看某个赛道所有投递的作品", notes = "需要组织或管理员权限,(不显示内容)")
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZATION')")
+    @GetMapping("channels/{channelId}")
+    public Result getWorksFromChannel(
+            @PathVariable String channelId
+    ) {
+        List<Work> channelWorks = workChannelMapper.getChannelWorks(channelId);
+        return Result.success(channelWorks);
+    }
+
+    @Transactional
+    @ApiOperation(value = "审核某个作品", notes = "需要组织权限, true 为通过, false 不通过")
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZATION')")
+    @PutMapping("/accept/{workId}")
+    public Result acceptWork(
+            @PathVariable String workId,
+            @RequestParam Boolean accept
+    ) {
+        Organization organization = UserUtil.getOrganization();
+        if (organization == null) return Result.failure();
+        WorkChannel workToChannel = workChannelMapper.selectById(workId);
+        if (workToChannel == null) return Result.of(ResultCode.WORK_NOT_EXIST_CHANNEL);
+        boolean exists = channelMapper.exists(new LambdaQueryWrapper<Channel>().eq(Channel::getId, workToChannel.getChannelId()).eq(Channel::getOrganizationId, organization.getId()));
+        if (!exists) return Result.of(ResultCode.NO_PERMISSION);
+        workToChannel.setAccept(accept);
+        workChannelMapper.updateById(workToChannel);
+        return Result.success(workToChannel);
+    }
+
     @ApiOperation(value = "将作品从赛道删除", notes = "需要团队权限")
     @PreAuthorize("hasAnyRole('TEAM')")
-    @DeleteMapping("/relationship/{channelId}/{workId}")
+    @DeleteMapping("/channel/{channelId}/{workId}")
     public Result delWorkFromChannel(
             @PathVariable String channelId,
             @PathVariable String workId
@@ -149,20 +194,57 @@ public class WorkController {
         if (channel == null) return Result.of(ResultCode.CHANNEL_NOT_EXIST);
         Work work = workMapper.selectOne(new LambdaQueryWrapper<Work>().select(Work::getId).eq(Work::getId, workId).eq(Work::getTeamId, team.getId()));
         if (work == null) return Result.of(ResultCode.WORK_NOT_EXIST);
-        int delete = workToChannelMapper.delete(new LambdaQueryWrapper<WorkToChannel>().eq(WorkToChannel::getWorkId, workId).eq(WorkToChannel::getChannelId, channelId));
+        int delete = workChannelMapper.delete(new LambdaQueryWrapper<WorkChannel>().eq(WorkChannel::getWorkId, workId).eq(WorkChannel::getChannelId, channelId));
         if (delete != 1) return Result.of(ResultCode.WORK_NOT_EXIST_CHANNEL);
         return Result.success();
     }
 
+    @Transactional
+    @ApiOperation(value = "给作品评分", notes = "需要裁判权限")
+    @PreAuthorize("hasAnyRole('JUDGE')")
+    @PostMapping("/score/{workId}")
+    public Result workScore(
+            @PathVariable String workId,
+            @RequestParam Double score
+    ) {
+        Judge judge = UserUtil.getJudge();
+        if (judge == null) return Result.of(ResultCode.NO_PERMISSION);
+        WorkChannel workChannel = workChannelMapper.selectById(workId);
+        if (workChannel == null) return Result.of(ResultCode.WORK_NOT_EXIST_CHANNEL);
+        JudgeChannel judgeChannel = judgeChannelMapper.selectOne(new LambdaQueryWrapper<JudgeChannel>().eq(JudgeChannel::getJudgeId, judge.getId()).eq(JudgeChannel::getChannelId, workChannel.getChannelId()));
+        if (judgeChannel == null) return Result.of(ResultCode.NO_PERMISSION);
+        WorkScore workScore = new WorkScore()
+                .setJudgeId(judge.getId())
+                .setWorkId(workChannel.getWorkId())
+                .setScore(score);
+        try {
+            workScoreMapper.insert(workScore);
+        } catch (Exception e) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            Result.of(ResultCode.WORK_ALREADY_EXIST_SCORE);
+        }
+        return Result.success(workScore);
+    }
+
+    @ApiOperation(value = "获取某个作品的平均分", notes = "需要组织/团队权限")
+    @PreAuthorize("hasAnyRole('TEAM','ORGANIZATION')")
+    @GetMapping("/score/{workId}")
+    public Result getScore(
+            @PathVariable String workId
+    ) {
+        return Result.success(workScoreMapper.getScore(workId));
+    }
+
     @ApiOperation(value = "获取该团队所有参加该赛道的作品", notes = "需要团队权限")
     @PreAuthorize("hasAnyRole('TEAM')")
-    @GetMapping("/relationship/{channelId}")
+    @GetMapping("/channel/{channelId}")
     public Result delWorkFromChannel(@PathVariable String channelId) {
         Team team = UserUtil.getTeam();
         if (team == null) return Result.failure();
-        List<WorkToChannel> works = workToChannelMapper.selectList(new LambdaQueryWrapper<WorkToChannel>().eq(WorkToChannel::getChannelId, channelId));
-        List<Integer> collect = works.stream().map(WorkToChannel::getWorkId).collect(Collectors.toList());
+        List<WorkChannel> works = workChannelMapper.selectList(new LambdaQueryWrapper<WorkChannel>().eq(WorkChannel::getChannelId, channelId));
+        List<Integer> collect = works.stream().map(WorkChannel::getWorkId).collect(Collectors.toList());
         List<Work> result = workMapper.selectBatchIds(collect);
         return Result.success(result);
     }
+
 }

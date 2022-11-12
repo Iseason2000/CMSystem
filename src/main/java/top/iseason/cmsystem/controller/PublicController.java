@@ -94,7 +94,12 @@ public class PublicController {
                 .setMail(mail)
                 .setPassword(passwordEncoder.encode(password))
                 .setRole(Role.JUDGE);
-        userMapper.insert(baseUser);
+        try {
+            userMapper.insert(baseUser);
+        } catch (Exception e) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return Result.of(ResultCode.USER_ID_EXIST);
+        }
         Judge judge = new Judge()
                 .setUserId(baseUser.getId())
                 .setName(name)
@@ -163,7 +168,13 @@ public class PublicController {
                 .setPassword(passwordEncoder.encode(password))
                 .setPhone(phone)
                 .setRole(Role.ORGANIZATION);
-        userMapper.insert(baseUser);
+
+        try {
+            userMapper.insert(baseUser);
+        } catch (Exception e) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return Result.of(ResultCode.USER_ID_EXIST);
+        }
 
         Organization organization = new Organization()
                 .setUserId(baseUser.getId())

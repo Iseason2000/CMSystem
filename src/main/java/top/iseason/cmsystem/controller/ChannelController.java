@@ -6,11 +6,16 @@ import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.web.bind.annotation.*;
 import top.iseason.cmsystem.entity.channel.Channel;
+import top.iseason.cmsystem.entity.relationship.JudgeChannel;
+import top.iseason.cmsystem.entity.user.Judge;
 import top.iseason.cmsystem.entity.user.Organization;
 import top.iseason.cmsystem.mapper.ChannelMapper;
-import top.iseason.cmsystem.mapper.OrganizationMapper;
+import top.iseason.cmsystem.mapper.JudgeChannelMapper;
+import top.iseason.cmsystem.mapper.JudgeMapper;
 import top.iseason.cmsystem.mapper.UserMapper;
 import top.iseason.cmsystem.utils.Result;
 import top.iseason.cmsystem.utils.ResultCode;
@@ -31,7 +36,10 @@ public class ChannelController {
     ChannelMapper channelMapper;
 
     @Resource
-    OrganizationMapper organizationMapper;
+    JudgeMapper judgeMapper;
+
+    @Resource
+    JudgeChannelMapper judgeChannelMapper;
 
     @ApiOperation(value = "获取该组织所有比赛(没有内容)", notes = "需要组织权限")
     @PreAuthorize("hasAnyRole('ORGANIZATION')")
@@ -73,6 +81,7 @@ public class ChannelController {
                 .setOrganizationId(organization.getId())
                 .setTitle(title)
                 .setContent(content)
+                .setCreateTime(new Date())
                 .setEndTime(endTime);
         channelMapper.insert(channel);
         return Result.success(channel);
@@ -112,5 +121,61 @@ public class ChannelController {
         int i = channelMapper.delete(new LambdaQueryWrapper<Channel>().eq(Channel::getId, id).eq(Channel::getOrganizationId, organization.getId()));
         if (i == 1) return Result.success();
         else return Result.of(ResultCode.CHANNEL_NOT_EXIST);
+    }
+
+    @Transactional
+    @ApiOperation(value = "将裁判加入一个赛道", notes = "需要组织权限")
+    @PreAuthorize("hasAnyRole('ORGANIZATION')")
+    @PostMapping("/judge")
+    public Result joinChannel(
+            @RequestParam String judgeId,
+            @RequestParam String channelId
+    ) {
+        Organization organization = UserUtil.getOrganization();
+        if (organization == null) return Result.of(ResultCode.NO_PERMISSION);
+        Judge judge = judgeMapper.selectById(judgeId);
+        if (judge == null) return Result.of(ResultCode.USER_ACCOUNT_NOT_EXIST);
+        boolean existsChannel = channelMapper.exists(new LambdaQueryWrapper<Channel>().eq(Channel::getId, channelId).eq(Channel::getOrganizationId, organization.getId()));
+        if (!existsChannel) return Result.of(ResultCode.CHANNEL_NOT_EXIST);
+        JudgeChannel judgeChannel = new JudgeChannel().setJudgeId(judge.getId()).setChannelId(Integer.parseInt(channelId));
+        try {
+            judgeChannelMapper.insert(judgeChannel);
+        } catch (Exception e) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return Result.of(ResultCode.JUDGE_ALREADY_EXIST_CHANNEL);
+        }
+        return Result.success(judgeChannel);
+    }
+
+    @Transactional
+    @ApiOperation(value = "将裁判从赛道中移除", notes = "需要组织权限")
+    @PreAuthorize("hasAnyRole('ORGANIZATION')")
+    @DeleteMapping("/judge")
+    public Result removeJudge(
+            @RequestParam String judgeId,
+            @RequestParam String channelId
+    ) {
+        Organization organization = UserUtil.getOrganization();
+        if (organization == null) return Result.of(ResultCode.NO_PERMISSION);
+        Judge judge = judgeMapper.selectById(judgeId);
+        if (judge == null) return Result.of(ResultCode.USER_ACCOUNT_NOT_EXIST);
+        boolean existsChannel = channelMapper.exists(new LambdaQueryWrapper<Channel>().eq(Channel::getId, channelId).eq(Channel::getOrganizationId, organization.getId()));
+        if (!existsChannel) return Result.of(ResultCode.CHANNEL_NOT_EXIST);
+        int delete = judgeChannelMapper.delete(new LambdaQueryWrapper<JudgeChannel>().eq(JudgeChannel::getJudgeId, judgeId).eq(JudgeChannel::getChannelId, channelId).last("limit 1"));
+        if (delete != 1) return Result.failure(ResultCode.JUDGE_NOT_EXIST_CHANNEL);
+        return Result.success();
+    }
+
+    @ApiOperation(value = "显示参与赛道的所有裁判", notes = "需要组织权限")
+    @PreAuthorize("hasAnyRole('ORGANIZATION')")
+    @GetMapping("/judge/{channelId}")
+    public Result showJudge(
+            @PathVariable String channelId
+    ) {
+        Organization organization = UserUtil.getOrganization();
+        if (organization == null) return Result.of(ResultCode.NO_PERMISSION);
+        boolean existsChannel = channelMapper.exists(new LambdaQueryWrapper<Channel>().eq(Channel::getId, channelId).eq(Channel::getOrganizationId, organization.getId()));
+        if (!existsChannel) return Result.of(ResultCode.CHANNEL_NOT_EXIST);
+        return Result.success(judgeChannelMapper.getJudges(channelId));
     }
 }

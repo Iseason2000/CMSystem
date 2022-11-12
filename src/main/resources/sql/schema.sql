@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS `CM_System`.`user_organization`
     `user_id` int         not null comment '用户id',
     `name`    varchar(36) not null comment '组织名称',
     `owner`   varchar(12) not null comment '组织负责人名字',
-    `idCard`  char(18)    not null comment '组织负责人身份证号',
+    `id_card` char(18)    not null comment '组织负责人身份证号',
     `profile` TEXT comment '组织简介',
     foreign key (`user_id`) references `CM_System`.`base_user` (`id`) on delete cascade,
     unique index user_organization_id_user_name (`id`, `user_id`, `name`)
@@ -61,11 +61,7 @@ CREATE TABLE IF NOT EXISTS `CM_System`.`user_admin`
     unique index user_admin_id_user_id (`id`, `user_id`)
 ) comment '大赛组织者表';
 
--- 默认账号 admin@mail.com admin123654
-insert ignore into `CM_System`.`base_user` (id, mail, password, role)
-values (1, 'admin@mail.com', '$2a$10$DiPF2HTX9Uzvuy83CRh4jOWzm1ZwC7CH4A6o7dXBTN9h7HiDZBv7G', 0);
-insert ignore into `CM_System`.`user_admin` (id, user_id, name)
-values (1, 1, '系统管理员');
+
 
 CREATE TABLE IF NOT EXISTS `CM_System`.`real_work`
 (
@@ -91,27 +87,50 @@ CREATE TABLE IF NOT EXISTS `CM_System`.`work`
     `profile` text comment '作品简介',
     `content` text comment '作品内容',
     `realID`  int comment '实物作品ID',
-    `score`   float comment '得分',
     foreign key (`team_id`) references `user_team` (`id`) on delete cascade,
     foreign key (`real_id`) references `real_work` (`id`) on delete set null,
     index work_team_id (`team_id`)
 ) comment '作品表';
+
 CREATE TABLE IF NOT EXISTS `CM_System`.`channel`
 (
     `id`              int primary key not null auto_increment comment '赛道id',
-    `organization_id` int             not null comment '组织id',
+    `organization_id` integer         not null comment '组织id',
     `title`           varchar(255)    not null comment '赛道名称',
     `content`         text comment '赛道内容',
-    `create_time`     int comment '创建时间',
-    `end_time`        float comment '结束时间',
-    foreign key (`organization_id`) references `user_team` (`id`) on delete cascade,
+    `create_time`     datetime comment '创建时间',
+    `end_time`        datetime comment '结束时间',
+    foreign key (`organization_id`) references `user_organization` (`id`) on delete cascade,
     index work_channel_id_time (`organization_id`, `title`)
 ) comment '赛道表';
+
 CREATE TABLE IF NOT EXISTS `CM_System`.`relation_work_channel`
 (
-    `work_id`    int primary key not null comment '赛道id',
+    `work_id`    int primary key not null comment '作品id',
     `channel_id` int             not null comment '组织id',
+    `accept`     boolean comment '审核状态',
     foreign key (`work_id`) references `work` (`id`) on delete cascade,
     foreign key (`channel_id`) references `channel` (`id`) on delete cascade,
-    unique index relation_work_channel (`work_id`, `channel_id`)
+    unique index relation_work_channel (`work_id`, `channel_id`, `accept`)
 ) comment '赛道表';
+
+CREATE TABLE IF NOT EXISTS `CM_System`.`relation_work_score`
+(
+    `id`       int primary key not null comment 'id',
+    `work_id`  int             not null comment '作品id',
+    `judge_id` int             not null comment '裁判id',
+    `score`    double          not null comment '得分',
+    foreign key (`work_id`) references `work` (`id`) on delete cascade,
+    foreign key (`judge_id`) references `user_judge` (`id`) on delete cascade,
+    unique index relation_work_score (`work_id`, `judge_id`)
+) comment '得分表';
+
+CREATE TABLE IF NOT EXISTS `CM_System`.`relation_judge_channel`
+(
+    `id`         int primary key not null comment 'id',
+    `judge_id`   int             not null comment '裁判id',
+    `channel_id` int             not null comment '赛道id',
+    foreign key (`channel_id`) references `channel` (`id`) on delete cascade,
+    foreign key (`judge_id`) references `user_judge` (`id`) on delete cascade,
+    unique index relation_judge_channel (`channel_id`, `judge_id`)
+) comment '裁判赛道表';
