@@ -13,12 +13,15 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandlerImpl;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 import top.iseason.cmsystem.entity.user.BaseUser;
 import top.iseason.cmsystem.service.UserService;
 import top.iseason.cmsystem.utils.Result;
 import top.iseason.cmsystem.utils.ResultCode;
 
 import javax.annotation.Resource;
+import java.util.Collections;
 
 @EnableWebSecurity
 public class SecurityConfig {
@@ -83,6 +86,7 @@ public class SecurityConfig {
                 .antMatchers("/admin/**").hasRole("ADMIN")
                 .antMatchers("/user/**").authenticated()
                 .antMatchers("/public/**").permitAll()
+
 //                .antMatchers("/doc.html").permitAll()
 //                .antMatchers("/webjars/**").permitAll()
 //                .anyRequest()
@@ -96,7 +100,17 @@ public class SecurityConfig {
                     response.getWriter().write(Result.of(ResultCode.USER_NOT_LOGIN).toString());
                 }).and()
                 .csrf().csrfTokenRepository(csrfTokenRepository())
-        ;
+                .and()
+                .cors(c -> {
+                    CorsConfigurationSource source = request -> {
+                        CorsConfiguration config = new CorsConfiguration();
+                        config.setAllowedOrigins(Collections.singletonList("*"));
+                        config.setAllowedMethods(Collections.singletonList("*"));
+                        return config;
+                    };
+                    c.configurationSource(source);
+                });
+
         return http.build();
     }
 
@@ -114,6 +128,7 @@ public class SecurityConfig {
 
     @Bean
     public CsrfTokenRepository csrfTokenRepository() {
+//        return new CookieCsrfTokenRepository();
         return new HttpSessionCsrfTokenRepository();
     }
 
